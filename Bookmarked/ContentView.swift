@@ -1,61 +1,73 @@
-//
-//  ContentView.swift
-//  Bookmarked
-//
-//  Created by Thomas McMahon on 11/10/2026.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    
+    @Query(sort: \Book.dateAdded, order: .reverse)
+    private var books: [Book]
+    
+    @State private var showingAddBook = false
+    
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        NavigationStack {
+            Group {
+                if books.isEmpty {
+                    ContentUnavailableView(
+                        "Your library is empty",
+                        systemImage: "books.vertical",
+                        description: Text(
+                            "Discover a book you like? Save it here!"
+                        )
+                    )
+                } else {
+                    List {
+                        ForEach(books) { book in
+                            NavigationLink {
+                                BookDetailView(book: book)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(book.title)
+                                        .font(.headline)
+
+                                    Text(book.author)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    if !book.genre.isEmpty {
+                                        Text(book.genre)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                            }
+                        }
+                        .onDelete(perform: deleteBooks)
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
+            .navigationTitle("My Library")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingAddBook = true
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            .sheet(isPresented: $showingAddBook) {
+                AddBookView()
             }
         }
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    
+    private func deleteBooks(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(books[index])
+        }
+        
+        try? modelContext.save()
+    }
 }

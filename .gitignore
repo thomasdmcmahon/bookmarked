@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Xcode user settings
+xcuserdata/
+*.xcuserstate
+
+# Build output
+build/
+DerivedData/
+*.ipa
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+Secrets.xcconfig
+
+# Temporary files
+*.swp
+*.tmp
