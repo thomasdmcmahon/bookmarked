@@ -2,10 +2,22 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Sheet Navigation
+
+private enum AddBookSheet: String, Identifiable {
+    case search
+    case scanner
+
+    var id: String { rawValue }
+}
+
+// MARK: - Add Book View
+
 struct AddBookView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    // Book information
     @State private var title = ""
     @State private var author = ""
     @State private var genre = ""
@@ -14,29 +26,42 @@ struct AddBookView: View {
     @State private var isbn = ""
     @State private var themesText = ""
     @State private var personalNote = ""
+
+    // Publication information
     @State private var publicationYear: Int?
     @State private var firstPublishYear: Int?
+
+    // Open Library metadata
     @State private var openLibraryKey: String?
     @State private var editionKey: String?
     @State private var coverID: Int?
-    @State private var metadataSource: String?
+
+    // ISBN lookup
     @State private var isbnInput = ""
     @State private var isLookingUpISBN = false
     @State private var lookupError: String?
-    @State private var showingSearch = false
+    @State private var metadataSource: String?
+
+    // Sheet navigation
+    @State private var activeSheet: AddBookSheet?
+    @State private var pendingScannedISBN: String?
+
+    // Save state
     @State private var saveError: String?
-    @State private var showingScanner = false
-    @State private var lastScannedISBN: String?
 
     private let service = BookLookupService()
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
             Form {
 
+                // MARK: Search by title or author
+
                 Section {
                     Button {
-                        showingSearch = true
+                        activeSheet = .search
                     } label: {
                         Label(
                             "Search Open Library",
@@ -45,10 +70,16 @@ struct AddBookView: View {
                     }
                 } header: {
                     Text("Find by Title or Author")
+                } footer: {
+                    Text(
+                        "Search for a book by title or author and select an edition."
+                    )
                 }
 
+                // MARK: Find by ISBN
+
                 Section {
-                    HStack {
+                    HStack(spacing: 12) {
                         TextField(
                             "Enter ISBN-10 or ISBN-13",
                             text: $isbnInput
@@ -56,15 +87,25 @@ struct AddBookView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .keyboardType(.asciiCapable)
-                        
+                        .submitLabel(.search)
+                        .onSubmit {
+                            Task {
+                                await lookupISBN()
+                            }
+                        }
+
+                        // Camera scanner
                         Button {
-                            showingScanner = true
+                            activeSheet = .scanner
                         } label: {
-                            Image(systemName: "camera.viewfinder")
-                                .font(.title2)
+                            Image(
+                                systemName: "camera.viewfinder"
+                            )
+                            .font(.title2)
                         }
                         .accessibilityLabel("Scan ISBN")
 
+                        // Manual ISBN lookup
                         Button {
                             Task {
                                 await lookupISBN()
@@ -80,13 +121,11 @@ struct AddBookView: View {
                             }
                         }
                         .disabled(
-                            isbnInput.isEmpty || isLookingUpISBN
+                            isbnInput.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ).isEmpty || isLookingUpISBN
                         )
-                    }
-                    .onSubmit {
-                        Task {
-                            await lookupISBN()
-                        }
+                        .accessibilityLabel("Look up ISBN")
                     }
 
                     if let lookupError {
@@ -95,7 +134,6 @@ struct AddBookView: View {
                             .foregroundStyle(.red)
                     }
 
-                    // Show metadata source after successful lookup
                     if let metadataSource {
                         Label(
                             "Metadata from \(metadataSource)",
@@ -104,13 +142,16 @@ struct AddBookView: View {
                         .font(.caption)
                         .foregroundStyle(.green)
                     }
+
                 } header: {
                     Text("Find by ISBN")
                 } footer: {
                     Text(
-                        "Enter the ISBN from the back of the book to find its exact edition."
+                        "Enter an ISBN manually or scan the barcode on the back of a book."
                     )
                 }
+
+                // MARK: Book information
 
                 Section("Book Information") {
                     TextField("Title", text: $title)
@@ -118,26 +159,31 @@ struct AddBookView: View {
                     TextField("Genre", text: $genre)
                 }
 
+                // MARK: Publication
+
                 Section("Publication") {
                     TextField("Publisher", text: $publisher)
 
                     TextField("ISBN", text: $isbn)
-                        .keyboardType(.asciiCapable)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
 
                     if let publicationYear {
                         LabeledContent(
-                            "Edition year",
+                            "Edition Year",
                             value: String(publicationYear)
                         )
                     }
 
                     if let firstPublishYear {
                         LabeledContent(
-                            "First published",
+                            "First Published",
                             value: String(firstPublishYear)
                         )
                     }
                 }
+
+                // MARK: Description
 
                 Section("Description") {
                     TextField(
@@ -148,6 +194,8 @@ struct AddBookView: View {
                     .lineLimit(4...10)
                 }
 
+                // MARK: Themes
+
                 Section("Themes") {
                     TextField(
                         "Separate themes with commas",
@@ -156,6 +204,8 @@ struct AddBookView: View {
                     )
                     .lineLimit(2...5)
                 }
+
+                // MARK: Personal notes
 
                 Section("Personal Notes") {
                     TextField(
@@ -168,6 +218,9 @@ struct AddBookView: View {
             }
             .navigationTitle("Add Book")
             .navigationBarTitleDisplayMode(.inline)
+
+            // MARK: Toolbar
+
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -182,33 +235,48 @@ struct AddBookView: View {
                     .disabled(
                         title.trimmingCharacters(
                             in: .whitespacesAndNewlines
-                        ).isEmpty
+                        ).isEmpty || isLookingUpISBN
                     )
                 }
             }
-            .sheet(isPresented: $showingScanner) {
-                ISBNScannerView { scannedISBN in
-                    isbnInput = scannedISBN
-                    lastScannedISBN = scannedISBN
-                    showingScanner = false
-                }
-            }
-            .onChange(of: showingScanner) { oldValue, newValue in
-                if oldValue && !newValue {
-                    let scannedISBN = isbnInput
 
-                    guard !scannedISBN.isEmpty,
-                          scannedISBN == lastScannedISBN else {
+            // MARK: Sheet Presentation
+
+            .sheet(
+                item: $activeSheet,
+                onDismiss: {
+                    guard let scannedISBN = pendingScannedISBN else {
                         return
                     }
 
-                    lastScannedISBN = nil
+                    pendingScannedISBN = nil
+                    isbnInput = scannedISBN
 
                     Task {
                         await lookupISBN()
                     }
                 }
+            ) { sheet in
+                switch sheet {
+
+                case .search:
+                    SearchBooksView { metadata in
+                        populateFields(from: metadata)
+                        metadataSource = "Open Library"
+                        lookupError = nil
+                        activeSheet = nil
+                    }
+
+                case .scanner:
+                    ISBNScannerView { scannedISBN in
+                        pendingScannedISBN = scannedISBN
+                        activeSheet = nil
+                    }
+                }
             }
+
+            // MARK: Save Error
+
             .alert(
                 "Could not save book",
                 isPresented: Binding(
@@ -225,11 +293,11 @@ struct AddBookView: View {
 
     // MARK: - ISBN Lookup
 
-    
-
     @MainActor
     private func lookupISBN() async {
-        guard !isLookingUpISBN else { return }
+        guard !isLookingUpISBN else {
+            return
+        }
 
         isLookingUpISBN = true
         lookupError = nil
@@ -263,7 +331,9 @@ struct AddBookView: View {
             lookupError = error.localizedDescription
         }
     }
-    
+
+    // MARK: - Manual Entry Fallback
+
     private func prepareManualEntry(for isbn: String) {
         title = ""
         author = ""
@@ -274,6 +344,7 @@ struct AddBookView: View {
 
         publicationYear = nil
         firstPublishYear = nil
+
         openLibraryKey = nil
         editionKey = nil
         coverID = nil
@@ -281,7 +352,7 @@ struct AddBookView: View {
 
         self.isbn = isbn
 
-        // Keep any personal note the user already wrote.
+        // Preserve any existing personal note.
     }
 
     // MARK: - Populate Form
@@ -301,7 +372,11 @@ struct AddBookView: View {
 
         publicationYear = metadata.publicationYear
         firstPublishYear = metadata.firstPublishYear
-        openLibraryKey = metadata.workKey
+
+        openLibraryKey = metadata.workKey.isEmpty
+            ? nil
+            : metadata.workKey
+
         editionKey = metadata.editionKey
         coverID = metadata.coverID
     }
