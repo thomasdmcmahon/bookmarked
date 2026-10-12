@@ -6,9 +6,9 @@ struct BookDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
 
-                // Book cover
+                // Cover
                 HStack {
                     Spacer()
 
@@ -26,6 +26,7 @@ struct BookDetailView: View {
                     Spacer()
                 }
 
+                // Title and author
                 VStack(alignment: .leading, spacing: 8) {
                     Text(book.title)
                         .font(.largeTitle)
@@ -34,61 +35,105 @@ struct BookDetailView: View {
                     Text(book.author)
                         .font(.title3)
                         .foregroundStyle(.secondary)
-                }
 
-                if !book.genre.isEmpty {
-                    Label(book.genre, systemImage: "tag")
+                    if !book.genre.isEmpty {
+                        Label(
+                            book.genre,
+                            systemImage: "tag"
+                        )
                         .foregroundStyle(.secondary)
+                    }
                 }
 
+                // Description
                 if !book.summary.isEmpty {
                     Divider()
 
-                    Text("About the Book")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("About the Book")
+                            .font(.headline)
 
-                    Text(book.summary)
+                        Text(book.summary)
+                            .font(.body)
+                    }
                 }
 
+                // Themes
+                if !book.themes.isEmpty {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Themes & Subjects")
+                            .font(.headline)
+
+                        ForEach(book.themes, id: \.self) { theme in
+                            Label(
+                                theme,
+                                systemImage: "tag"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Personal notes
                 if !book.personalNote.isEmpty {
                     Divider()
 
-                    Text("My Notes")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("My Notes")
+                            .font(.headline)
 
-                    Text(book.personalNote)
+                        Text(book.personalNote)
+                    }
                 }
 
+                // Publication details
                 Divider()
 
-                LabeledContent(
-                    "Date Added",
-                    value: book.dateAdded,
-                    format: .dateTime.day().month().year()
-                )
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Publication Details")
+                        .font(.headline)
 
-                if let year = book.publicationYear {
+                    if !book.publisher.isEmpty {
+                        LabeledContent(
+                            "Publisher",
+                            value: book.publisher
+                        )
+                    }
+
+                    if let year = book.publicationYear {
+                        LabeledContent(
+                            "Edition Year",
+                            value: String(year)
+                        )
+                    }
+
+                    if let year = book.firstPublishYear {
+                        LabeledContent(
+                            "First Published",
+                            value: String(year)
+                        )
+                    }
+
+                    if !book.isbn.isEmpty {
+                        LabeledContent(
+                            "ISBN",
+                            value: book.isbn
+                        )
+                    }
+
                     LabeledContent(
-                        "First Published",
-                        value: String(year)
+                        "Date Added",
+                        value: book.dateAdded,
+                        format: .dateTime.day().month().year()
                     )
                 }
 
-                if !book.publisher.isEmpty {
-                    LabeledContent(
-                        "Publisher",
-                        value: book.publisher
-                    )
-                }
-
-                if !book.isbn.isEmpty {
-                    LabeledContent(
-                        "ISBN",
-                        value: book.isbn
-                    )
-                }
-
-                if let key = book.openLibraryKey,
+                // Open Library links
+                if let key = book.editionKey ??
+                    book.openLibraryKey,
                    let url = URL(
                     string: "https://openlibrary.org\(key)"
                    ) {
