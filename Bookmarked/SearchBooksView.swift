@@ -4,7 +4,7 @@ import SwiftUI
 struct SearchBooksView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let onSelect: (OpenLibraryBook) -> Void
+    let onSelect: (BookMetadata) -> Void
 
     @State private var searchText = ""
     @State private var results: [OpenLibraryBook] = []
@@ -34,12 +34,16 @@ struct SearchBooksView: View {
                     )
                 } else {
                     List(results) { book in
-                        Button {
-                            onSelect(book)
-                            dismiss()
+                        NavigationLink {
+                            EditionSelectionView(
+                                work: book,
+                                onSelect: onSelect
+                            )
                         } label: {
                             HStack(spacing: 14) {
-                                AsyncImage(url: book.coverURL) { image in
+                                AsyncImage(
+                                    url: book.coverURL
+                                ) { image in
                                     image
                                         .resizable()
                                         .scaledToFit()
@@ -49,10 +53,12 @@ struct SearchBooksView: View {
                                 }
                                 .frame(width: 55, height: 80)
 
-                                VStack(alignment: .leading, spacing: 5) {
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 5
+                                ) {
                                     Text(book.title)
                                         .font(.headline)
-                                        .foregroundStyle(.primary)
 
                                     Text(book.author)
                                         .font(.subheadline)
@@ -64,12 +70,9 @@ struct SearchBooksView: View {
                                             .foregroundStyle(.secondary)
                                     }
                                 }
-
-                                Spacer()
                             }
                             .padding(.vertical, 4)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -100,9 +103,7 @@ struct SearchBooksView: View {
         errorMessage = nil
         results = []
 
-        defer {
-            isLoading = false
-        }
+        defer { isLoading = false }
 
         do {
             results = try await service.searchBooks(
