@@ -9,10 +9,16 @@ struct AddBookView: View {
     @State private var title = ""
     @State private var author = ""
     @State private var genre = ""
+    @State private var summary = ""
+    @State private var publisher = ""
+    @State private var isbn = ""
+    @State private var themesText = ""
     @State private var personalNote = ""
 
     @State private var publicationYear: Int?
+    @State private var firstPublishYear: Int?
     @State private var openLibraryKey: String?
+    @State private var editionKey: String?
     @State private var coverID: Int?
 
     @State private var showingSearch = false
@@ -30,23 +36,51 @@ struct AddBookView: View {
                             systemImage: "magnifyingglass"
                         )
                     }
-                } footer: {
-                    Text(
-                        "Find a book automatically or enter its details manually."
-                    )
                 }
 
                 Section("Book Information") {
                     TextField("Title", text: $title)
                     TextField("Author", text: $author)
                     TextField("Genre", text: $genre)
+                }
 
-                    if let publicationYear {
+                Section("Publication") {
+                    TextField("Publisher", text: $publisher)
+
+                    TextField("ISBN", text: $isbn)
+                        .keyboardType(.numbersAndPunctuation)
+
+                    if let year = publicationYear {
                         LabeledContent(
-                            "First published",
-                            value: String(publicationYear)
+                            "Edition year",
+                            value: String(year)
                         )
                     }
+
+                    if let year = firstPublishYear {
+                        LabeledContent(
+                            "First published",
+                            value: String(year)
+                        )
+                    }
+                }
+
+                Section("Description") {
+                    TextField(
+                        "Book description",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(4...10)
+                }
+
+                Section("Themes") {
+                    TextField(
+                        "Separate themes with commas",
+                        text: $themesText,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
                 }
 
                 Section("Personal Notes") {
@@ -79,8 +113,9 @@ struct AddBookView: View {
                 }
             }
             .sheet(isPresented: $showingSearch) {
-                SearchBooksView { selectedBook in
-                    populateFields(from: selectedBook)
+                SearchBooksView { metadata in
+                    populateFields(from: metadata)
+                    showingSearch = false
                 }
             }
             .alert(
@@ -97,17 +132,37 @@ struct AddBookView: View {
         }
     }
 
-    private func populateFields(from book: OpenLibraryBook) {
-        title = book.title
-        author = book.author
-        publicationYear = book.firstPublishYear
-        openLibraryKey = book.key
-        coverID = book.coverID
+    private func populateFields(from metadata: BookMetadata) {
+        title = metadata.title
+        author = metadata.author
+        summary = metadata.summary
+        publisher = metadata.publisher
+        isbn = metadata.isbn
 
-        genre = book.subjects?.first ?? ""
+        themesText = metadata.themes.joined(
+            separator: ", "
+        )
+
+        // Genre requires separate classification
+        genre = ""
+
+        publicationYear = metadata.publicationYear
+        firstPublishYear = metadata.firstPublishYear
+        openLibraryKey = metadata.workKey
+        editionKey = metadata.editionKey
+        coverID = metadata.coverID
     }
 
     private func saveBook() {
+        let themes = themesText
+            .split(separator: ",")
+            .map {
+                $0.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            }
+            .filter { !$0.isEmpty }
+
         let book = Book(
             title: title.trimmingCharacters(
                 in: .whitespacesAndNewlines
@@ -115,13 +170,17 @@ struct AddBookView: View {
             author: author.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ),
-            genre: genre.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ),
+            genre: genre,
+            summary: summary,
+            publisher: publisher,
             publicationYear: publicationYear,
+            isbn: isbn,
             personalNote: personalNote,
             openLibraryKey: openLibraryKey,
-            coverID: coverID
+            coverID: coverID,
+            editionKey: editionKey,
+            firstPublishYear: firstPublishYear,
+            themes: themes
         )
 
         modelContext.insert(book)
