@@ -20,6 +20,7 @@ struct AddBookView: View {
     @State private var openLibraryKey: String?
     @State private var editionKey: String?
     @State private var coverID: Int?
+    @State private var metadataSource: String?
 
     @State private var isbnInput = ""
     @State private var isLookingUpISBN = false
@@ -28,7 +29,7 @@ struct AddBookView: View {
     @State private var showingSearch = false
     @State private var saveError: String?
 
-    private let service = OpenLibraryService()
+    private let service = BookLookupService()
 
     var body: some View {
         NavigationStack {
@@ -85,6 +86,16 @@ struct AddBookView: View {
                         Text(lookupError)
                             .font(.caption)
                             .foregroundStyle(.red)
+                    }
+
+                    // Show metadata source after successful lookup
+                    if let metadataSource {
+                        Label(
+                            "Metadata from \(metadataSource)",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.green)
                     }
                 } header: {
                     Text("Find by ISBN")
@@ -191,12 +202,14 @@ struct AddBookView: View {
     // MARK: - ISBN Lookup
 
     
+
     @MainActor
     private func lookupISBN() async {
         guard !isLookingUpISBN else { return }
 
         isLookingUpISBN = true
         lookupError = nil
+        metadataSource = nil
 
         defer {
             isLookingUpISBN = false
@@ -207,25 +220,25 @@ struct AddBookView: View {
         )
 
         do {
-            let metadata = try await service.lookupISBN(
+            let result = try await service.lookupISBN(
                 normalizedISBN
             )
 
-            populateFields(from: metadata)
+            populateFields(from: result.metadata)
+            metadataSource = result.source.displayName
 
-        } catch OpenLibraryError.bookNotFound {
+        } catch BookLookupError.bookNotFound {
             prepareManualEntry(for: normalizedISBN)
 
             lookupError = """
-            This edition isn't available in Open Library.
-            You can still save it by entering its details manually.
+            This ISBN was not found in Open Library or
+            Nasjonalbiblioteket. You can still save it manually.
             """
 
         } catch {
             lookupError = error.localizedDescription
         }
     }
-
     
     private func prepareManualEntry(for isbn: String) {
         title = ""
@@ -240,12 +253,12 @@ struct AddBookView: View {
         openLibraryKey = nil
         editionKey = nil
         coverID = nil
+        metadataSource = nil
 
         self.isbn = isbn
 
         // Keep any personal note the user already wrote.
     }
-
 
     // MARK: - Populate Form
 
