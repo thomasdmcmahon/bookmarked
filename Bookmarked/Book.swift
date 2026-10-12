@@ -16,6 +16,9 @@ final class Book {
     // Open Library metadata
     var openLibraryKey: String?
     var coverID: Int?
+    var editionKey: String?
+    var firstPublishYear: Int?
+    var themes: [String] = []
     
     init(
         title: String,
@@ -27,7 +30,10 @@ final class Book {
         isbn: String = "",
         personalNote: String = "",
         openLibraryKey: String? = nil,
-        coverID: Int? = nil
+        coverID: Int? = nil,
+        editionKey: String? = nil,
+        firstPublishYear: Int? = nil,
+        themes: [String] = []
     ) {
         self.title = title
         self.author = author
@@ -38,8 +44,12 @@ final class Book {
         self.isbn = isbn
         self.personalNote = personalNote
         self.dateAdded = Date()
+        
         self.openLibraryKey = openLibraryKey
         self.coverID = coverID
+        self.editionKey = editionKey
+        self.firstPublishYear = firstPublishYear
+        self.themes = themes
     }
     
     var coverURL: URL? {
