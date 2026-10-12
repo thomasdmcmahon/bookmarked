@@ -93,10 +93,12 @@ struct EditionSelectionView: View {
 
             Section {
                 Picker("Language", selection: $selectedLanguage) {
-                    ForEach(languages, id: \.0) { language in
-                        Text(language.1)
-                            .tag(language.0)
-                    }
+                    Text("All languages").tag("all")
+                    Text("English").tag("eng")
+                    Text("Norwegian").tag("nor")
+                    Text("French").tag("fre")
+                    Text("German").tag("ger")
+                    Text("Spanish").tag("spa")
                 }
 
                 Text(
