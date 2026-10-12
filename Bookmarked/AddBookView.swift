@@ -14,20 +14,19 @@ struct AddBookView: View {
     @State private var isbn = ""
     @State private var themesText = ""
     @State private var personalNote = ""
-
     @State private var publicationYear: Int?
     @State private var firstPublishYear: Int?
     @State private var openLibraryKey: String?
     @State private var editionKey: String?
     @State private var coverID: Int?
     @State private var metadataSource: String?
-
     @State private var isbnInput = ""
     @State private var isLookingUpISBN = false
     @State private var lookupError: String?
-
     @State private var showingSearch = false
     @State private var saveError: String?
+    @State private var showingScanner = false
+    @State private var lastScannedISBN: String?
 
     private let service = BookLookupService()
 
@@ -57,6 +56,14 @@ struct AddBookView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .keyboardType(.asciiCapable)
+                        
+                        Button {
+                            showingScanner = true
+                        } label: {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.title2)
+                        }
+                        .accessibilityLabel("Scan ISBN")
 
                         Button {
                             Task {
@@ -179,10 +186,27 @@ struct AddBookView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingSearch) {
-                SearchBooksView { metadata in
-                    populateFields(from: metadata)
-                    showingSearch = false
+            .sheet(isPresented: $showingScanner) {
+                ISBNScannerView { scannedISBN in
+                    isbnInput = scannedISBN
+                    lastScannedISBN = scannedISBN
+                    showingScanner = false
+                }
+            }
+            .onChange(of: showingScanner) { oldValue, newValue in
+                if oldValue && !newValue {
+                    let scannedISBN = isbnInput
+
+                    guard !scannedISBN.isEmpty,
+                          scannedISBN == lastScannedISBN else {
+                        return
+                    }
+
+                    lastScannedISBN = nil
+
+                    Task {
+                        await lookupISBN()
+                    }
                 }
             }
             .alert(
