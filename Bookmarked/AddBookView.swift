@@ -21,12 +21,19 @@ struct AddBookView: View {
     @State private var editionKey: String?
     @State private var coverID: Int?
 
+    @State private var isbnInput = ""
+    @State private var isLookingUpISBN = false
+    @State private var lookupError: String?
+
     @State private var showingSearch = false
     @State private var saveError: String?
+
+    private let service = OpenLibraryService()
 
     var body: some View {
         NavigationStack {
             Form {
+
                 Section {
                     Button {
                         showingSearch = true
@@ -36,6 +43,55 @@ struct AddBookView: View {
                             systemImage: "magnifyingglass"
                         )
                     }
+                } header: {
+                    Text("Find by Title or Author")
+                }
+
+                Section {
+                    HStack {
+                        TextField(
+                            "Enter ISBN-10 or ISBN-13",
+                            text: $isbnInput
+                        )
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .keyboardType(.asciiCapable)
+
+                        Button {
+                            Task {
+                                await lookupISBN()
+                            }
+                        } label: {
+                            if isLookingUpISBN {
+                                ProgressView()
+                            } else {
+                                Image(
+                                    systemName: "arrow.right.circle.fill"
+                                )
+                                .font(.title2)
+                            }
+                        }
+                        .disabled(
+                            isbnInput.isEmpty || isLookingUpISBN
+                        )
+                    }
+                    .onSubmit {
+                        Task {
+                            await lookupISBN()
+                        }
+                    }
+
+                    if let lookupError {
+                        Text(lookupError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Find by ISBN")
+                } footer: {
+                    Text(
+                        "Enter the ISBN from the back of the book to find its exact edition."
+                    )
                 }
 
                 Section("Book Information") {
@@ -48,19 +104,19 @@ struct AddBookView: View {
                     TextField("Publisher", text: $publisher)
 
                     TextField("ISBN", text: $isbn)
-                        .keyboardType(.numbersAndPunctuation)
+                        .keyboardType(.asciiCapable)
 
-                    if let year = publicationYear {
+                    if let publicationYear {
                         LabeledContent(
                             "Edition year",
-                            value: String(year)
+                            value: String(publicationYear)
                         )
                     }
 
-                    if let year = firstPublishYear {
+                    if let firstPublishYear {
                         LabeledContent(
                             "First published",
-                            value: String(year)
+                            value: String(firstPublishYear)
                         )
                     }
                 }
@@ -132,6 +188,33 @@ struct AddBookView: View {
         }
     }
 
+    // MARK: - ISBN Lookup
+
+    @MainActor
+    private func lookupISBN() async {
+        guard !isLookingUpISBN else { return }
+
+        isLookingUpISBN = true
+        lookupError = nil
+
+        defer {
+            isLookingUpISBN = false
+        }
+
+        do {
+            let metadata = try await service.lookupISBN(
+                isbnInput
+            )
+
+            populateFields(from: metadata)
+
+        } catch {
+            lookupError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Populate Form
+
     private func populateFields(from metadata: BookMetadata) {
         title = metadata.title
         author = metadata.author
@@ -143,7 +226,6 @@ struct AddBookView: View {
             separator: ", "
         )
 
-        // Genre requires separate classification
         genre = ""
 
         publicationYear = metadata.publicationYear
@@ -152,6 +234,8 @@ struct AddBookView: View {
         editionKey = metadata.editionKey
         coverID = metadata.coverID
     }
+
+    // MARK: - Save Book
 
     private func saveBook() {
         let themes = themesText
