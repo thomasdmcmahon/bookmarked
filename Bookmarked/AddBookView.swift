@@ -190,6 +190,7 @@ struct AddBookView: View {
 
     // MARK: - ISBN Lookup
 
+    
     @MainActor
     private func lookupISBN() async {
         guard !isLookingUpISBN else { return }
@@ -201,17 +202,50 @@ struct AddBookView: View {
             isLookingUpISBN = false
         }
 
+        let normalizedISBN = OpenLibraryService.normalizeISBN(
+            isbnInput
+        )
+
         do {
             let metadata = try await service.lookupISBN(
-                isbnInput
+                normalizedISBN
             )
 
             populateFields(from: metadata)
+
+        } catch OpenLibraryError.bookNotFound {
+            prepareManualEntry(for: normalizedISBN)
+
+            lookupError = """
+            This edition isn't available in Open Library.
+            You can still save it by entering its details manually.
+            """
 
         } catch {
             lookupError = error.localizedDescription
         }
     }
+
+    
+    private func prepareManualEntry(for isbn: String) {
+        title = ""
+        author = ""
+        genre = ""
+        summary = ""
+        publisher = ""
+        themesText = ""
+
+        publicationYear = nil
+        firstPublishYear = nil
+        openLibraryKey = nil
+        editionKey = nil
+        coverID = nil
+
+        self.isbn = isbn
+
+        // Keep any personal note the user already wrote.
+    }
+
 
     // MARK: - Populate Form
 
